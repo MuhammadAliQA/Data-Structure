@@ -1,479 +1,485 @@
 """
-tests.py – SkyNet DSA Test Suite
-Assignment P5: Error handling va edge case testlar
+SkyNet – Comprehensive Test Suite
+Covers: normal cases, edge cases, error handling
 """
 
-from graph     import Graph, Dijkstra, Kruskal
+from graph     import Graph, Dijkstra, BellmanFord, Kruskal, compare_shortest_paths
 from passenger import PriorityCheckIn, BoardingQueue, CargoStack
 from search    import BST, AVLTree, HashTable, KMP
-from sorting   import QuickSort, MergeSort
+from sorting   import QuickSort, MergeSort, compare_sorts
 from routing   import RouteFinder
 
+PASS = "  ✔ PASS"
+FAIL = "  ✘ FAIL"
 
-# ══════════════════════════════════════════════════════
-#  Yordamchi funksiyalar
-# ══════════════════════════════════════════════════════
-passed = 0
-failed = 0
-
-
-def check(test_name, condition, expected=None, got=None):
-    global passed, failed
-    if condition:
-        print(f"  ✅ PASS  {test_name}")
-        passed += 1
+def assert_eq(label, actual, expected):
+    if actual == expected:
+        print(f"{PASS}  {label}")
     else:
-        print(f"  ❌ FAIL  {test_name}")
-        if expected is not None:
-            print(f"         Kutilgan : {expected}")
-            print(f"         Kelgan   : {got}")
-        failed += 1
+        print(f"{FAIL}  {label}")
+        print(f"       expected : {expected}")
+        print(f"       got      : {actual}")
+
+def assert_true(label, condition):
+    print(f"{PASS}  {label}" if condition else f"{FAIL}  {label}")
+
+def header(title):
+    print(f"\n{'═'*55}")
+    print(f"  TEST: {title}")
+    print('═'*55)
 
 
-def section(title):
-    print(f"\n{'═' * 52}")
-    print(f"  ✈  {title}")
-    print(f"{'═' * 52}")
+# ══════════════════════════════════════════════
+#  1. GRAPH TESTS
+# ══════════════════════════════════════════════
+header("Graph – Normal & Edge Cases")
 
+# Empty graph display (should not crash)
+g_empty = Graph()
+try:
+    g_empty.display()
+    print(f"{PASS}  Empty graph display – no crash")
+except Exception as e:
+    print(f"{FAIL}  Empty graph display – {e}")
 
-def summary():
-    total = passed + failed
-    print(f"\n{'═' * 52}")
-    print(f"  NATIJA: {passed}/{total} test muvaffaqiyatli o'tdi")
-    if failed == 0:
-        print("  🎉 Barcha testlar PASS!")
-    else:
-        print(f"  ⚠️  {failed} ta test FAIL – tekshiring!")
-    print(f"{'═' * 52}\n")
-
-
-# ══════════════════════════════════════════════════════
-#  PHASE 1 – Graph testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 1 – Graph")
-
+# Normal graph
 g = Graph()
 g.add_airport("A")
 g.add_airport("B")
 g.add_airport("C")
-g.add_undirected_flight("A", "B", 10)
-g.add_undirected_flight("B", "C", 20)
+g.add_flight("A", "B", 10)
+g.add_flight("B", "C", 20)
+assert_true("Graph has 3 airports",     len(g.graph) == 3)
+assert_true("A connected to B",         ("B", 10) in g.graph["A"])
+assert_true("B connected to A (undirected)", ("A", 10) in g.graph["B"])
 
-check("Aeroport qo'shildi",
-      "A" in g.graph and "B" in g.graph and "C" in g.graph)
+# Duplicate airport
+g.add_airport("A")
+assert_true("Duplicate airport not added twice", len(g.graph) == 3)
 
-check("Flight A→B mavjud",
-      ("B", 10) in g.graph["A"])
-
-check("Undirected: B→A ham mavjud",
-      ("A", 10) in g.graph["B"])
-
-check("Bo'sh grafga aeroport qo'shish",
-      len(Graph().graph) == 0)
-
-check("Takroriy aeroport qo'shilmaydi",
-      len(g.graph) == 3)   # A, B, C – 3 ta
+# Invalid flight cost
+try:
+    g.add_flight("A", "C", -5)
+    print(f"{FAIL}  Negative cost should raise ValueError")
+except ValueError:
+    print(f"{PASS}  Negative cost raises ValueError")
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 1 – Dijkstra testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 1 – Dijkstra")
+# ══════════════════════════════════════════════
+#  2. DIJKSTRA TESTS
+# ══════════════════════════════════════════════
+header("Dijkstra – Shortest Path")
 
 d = Dijkstra()
 
-# Normal holat
-net = {
-    "Tashkent": [("Dubai", 500), ("Istanbul", 400)],
-    "Dubai":    [("London", 700)],
-    "Istanbul": [("London", 600)],
-    "London":   [],
+# Empty graph
+r = d.shortest_path({}, "X")
+assert_true("Empty graph returns error string", isinstance(r, str))
+
+# Unknown source
+r = d.shortest_path({"A": []}, "Z")
+assert_true("Unknown source returns error string", isinstance(r, str))
+
+# Standard graph
+graph_d = {
+    "A": [("B", 5), ("C", 10)],
+    "B": [("C", 3), ("A", 5)],
+    "C": [("A", 10), ("B", 3)],
 }
-dists, prev = d.shortest_path(net, "Tashkent")
+r = d.shortest_path(graph_d, "A")
+assert_eq("A→A distance = 0",  r["A"][0], 0)
+assert_eq("A→B distance = 5",  r["B"][0], 5)
+assert_eq("A→C distance = 8",  r["C"][0], 8)   # via B (5+3)
 
-check("Start tugunning masofasi 0",
-      dists["Tashkent"] == 0)
-
-check("Tashkent→Dubai = 500",
-      dists["Dubai"] == 500)
-
-check("Tashkent→Istanbul = 400",
-      dists["Istanbul"] == 400)
-
-check("Tashkent→London eng qisqa = 1000 (Istanbul orqali)",
-      dists["London"] == 1000,
-      expected=1000, got=dists["London"])
-
-path = d.get_path(prev, "Tashkent", "London")
-check("London yo'li: Tashkent→Istanbul→London",
-      path == ["Tashkent", "Istanbul", "London"],
-      expected=["Tashkent", "Istanbul", "London"], got=path)
-
-# Edge case: bo'sh graf
-dists2, msg = d.shortest_path({}, "A")
-check("Bo'sh grafda xato xabari qaytadi",
-      dists2 is None)
-
-# Edge case: mavjud bo'lmagan start
-dists3, msg3 = d.shortest_path(net, "Paris")
-check("Noto'g'ri start node – xato xabari",
-      dists3 is None)
-
-# Edge case: bir tugunli graf
-solo = {"X": []}
-dists4, _ = d.shortest_path(solo, "X")
-check("Bir tugunli grafda start=0",
-      dists4["X"] == 0)
+# Disconnected graph
+graph_disc = {
+    "A": [("B", 1)],
+    "B": [("A", 1)],
+    "C": [],
+}
+r = d.shortest_path(graph_disc, "A")
+assert_eq("Disconnected node C = inf", r["C"][0], float('inf'))
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 1 – Kruskal (MST) testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 1 – Kruskal MST")
+# ══════════════════════════════════════════════
+#  3. KRUSKAL MST TESTS
+# ══════════════════════════════════════════════
+header("Kruskal – Minimum Spanning Tree")
 
 k = Kruskal()
 
-mst_graph = {
+# Empty graph
+edges, total = k.mst({})
+assert_eq("Empty graph MST cost = 0", total, 0)
+
+# Triangle graph
+graph_k = {
     "A": [("B", 1), ("C", 4)],
-    "B": [("A", 1), ("C", 2), ("D", 5)],
-    "C": [("A", 4), ("B", 2), ("D", 1)],
-    "D": [("B", 5), ("C", 1)],
+    "B": [("A", 1), ("C", 2)],
+    "C": [("A", 4), ("B", 2)],
 }
-edges, total = k.mst(mst_graph)
-
-check("MST edge soni to'g'ri (V-1 = 3)",
-      len(edges) == 3,
-      expected=3, got=len(edges))
-
-check("MST umumiy narxi minimal = 4",
-      total == 4,
-      expected=4, got=total)
-
-# Siklik graf (cycle bor) – MST siklni o'tkazib ketishi kerak
-cycle_graph = {
-    "X": [("Y", 10), ("Z", 6)],
-    "Y": [("X", 10), ("Z", 5)],
-    "Z": [("X", 6),  ("Y", 5)],
-}
-k2 = Kruskal()
-edges2, total2 = k2.mst(cycle_graph)
-check("Sikliy grafda ham MST to'g'ri (V-1 edge)",
-      len(edges2) == 2)
-check("Sikliy grafda narx minimal = 11",
-      total2 == 11,
-      expected=11, got=total2)
+edges, total = k.mst(graph_k)
+assert_eq("Triangle MST cost = 3 (edges 1+2)", total, 3)
+assert_eq("Triangle MST has 2 edges (V-1)", len(edges), 2)
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 2 – Priority Queue testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 2 – Priority Queue (Max-Heap)")
+# ══════════════════════════════════════════════
+#  4. PRIORITY CHECK-IN TESTS
+# ══════════════════════════════════════════════
+header("PriorityCheckIn – Max-Heap")
 
 p = PriorityCheckIn()
 
-# Bo'sh holatda serve
-result = p.serve()
-check("Bo'sh navbatda serve – xato xabari",
-      "bo'sh" in result.lower() or "yo'q" in result.lower())
+# Empty serve
+r = p.serve()
+assert_true("Empty queue serve returns string", isinstance(r, str))
 
-# Ustuvorlik tartibi
-p.add_passenger("Economy1", "Economy")
-p.add_passenger("Platinum1", "Platinum")
-p.add_passenger("Gold1", "Gold")
-p.add_passenger("Platinum2", "Platinum")
+# Priority ordering: Platinum must come before Gold and Economy
+p.add_passenger("Ali",  "Economy")
+p.add_passenger("John", "Platinum")
+p.add_passenger("Sara", "Gold")
 
-first  = p.serve()
+first = p.serve()
+assert_eq("Platinum served first", first["class"], "Platinum")
 second = p.serve()
-third  = p.serve()
+assert_eq("Gold served second",    second["class"], "Gold")
+third = p.serve()
+assert_eq("Economy served last",   third["class"], "Economy")
 
-check("Birinchi Platinum chiqishi kerak",
-      "Platinum" in first)
-
-check("Ikkinchi ham Platinum (ikkita Platinum bor)",
-      "Platinum" in second)
-
-check("Uchinchi Gold chiqishi kerak",
-      "Gold" in third)
-
-# Priority collision: ikki xil Platinum – FIFO tartib
+# FIFO within same class
 p2 = PriorityCheckIn()
-p2.add_passenger("First",  "Platinum")
-p2.add_passenger("Second", "Platinum")
+p2.add_passenger("First",  "Gold")
+p2.add_passenger("Second", "Gold")
 r1 = p2.serve()
-r2 = p2.serve()
-check("Bir xil ustuvorlikda FIFO tartibi (First avval)",
-      "First" in r1 and "Second" in r2)
+assert_eq("FIFO within same class – First served first", r1["name"], "First")
+
+# Invalid class
+try:
+    p.add_passenger("Bob", "VIP")
+    print(f"{FAIL}  Unknown class should raise ValueError")
+except ValueError:
+    print(f"{PASS}  Unknown ticket class raises ValueError")
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 2 – Queue va Stack testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 2 – BoardingQueue (FIFO) & CargoStack (LIFO)")
+# ══════════════════════════════════════════════
+#  5. BOARDING QUEUE & CARGO STACK TESTS
+# ══════════════════════════════════════════════
+header("BoardingQueue (FIFO) & CargoStack (LIFO)")
 
-# FIFO Queue
 q = BoardingQueue()
-check("Bo'sh queuedan remove – xato xabari",
-      "bo'sh" in q.remove().lower())
-
-q.add("Ali")
-q.add("Sara")
-q.add("John")
-
-check("FIFO: birinchi kirgan birinchi chiqadi (Ali)",
-      "Ali" in q.remove())
-
-check("FIFO: ikkinchi Sara",
-      "Sara" in q.remove())
-
-check("Queue hajmi to'g'ri",
-      q.size() == 1)
-
-# LIFO Stack
 s = CargoStack()
-check("Bo'sh stackdan pop – xato xabari",
-      "bo'sh" in s.pop().lower())
 
+# Empty dequeue / pop
+assert_true("Empty queue remove returns string", isinstance(q.remove(), str))
+assert_true("Empty stack pop returns string",    isinstance(s.pop(), str))
+
+# FIFO order
+q.add("Passenger1")
+q.add("Passenger2")
+q.add("Passenger3")
+assert_eq("FIFO – Passenger1 first", q.remove(), "Passenger1")
+assert_eq("FIFO – Passenger2 next",  q.remove(), "Passenger2")
+
+# LIFO order
 s.push("Bag1")
 s.push("Bag2")
 s.push("Bag3")
+assert_eq("LIFO – Bag3 unloaded first", s.pop(), "Bag3")
+assert_eq("LIFO – Bag2 unloaded next",  s.pop(), "Bag2")
 
-check("LIFO: oxirgi kirgani birinchi chiqadi (Bag3)",
-      "Bag3" in s.pop())
-
-check("LIFO: keyingisi Bag2",
-      "Bag2" in s.pop())
-
-check("Stack hajmi to'g'ri",
-      s.size() == 1)
+# Size
+q2 = BoardingQueue()
+q2.add("A"); q2.add("B")
+assert_eq("Queue size = 2", q2.size(), 2)
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 3 – BST testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 3 – Binary Search Tree")
+# ══════════════════════════════════════════════
+#  6. BST TESTS
+# ══════════════════════════════════════════════
+header("BST – Insert / Search / Range Query")
 
 bst = BST()
 
-# Bo'sh BST
-check("Bo'sh BST da search False qaytaradi",
-      bst.search(100) == False)
+# Empty tree
+assert_eq("Empty BST inorder = []", bst.inorder(), [])
+assert_eq("Empty BST search  = False", bst.search(10), False)
+assert_eq("Empty BST range   = []", bst.range_query(0, 100), [])
 
-check("Bo'sh BST range_query bo'sh ro'yxat",
-      bst.range_query(0, 999) == [])
-
-# Normal holat
-for v in [500, 300, 700, 200, 400, 600, 800]:
+# Insertions
+for v in [50, 30, 70, 20, 40, 60, 80]:
     bst.insert(v)
 
-check("BST inorder tartiblangan chiqadi",
-      bst.inorder() == [200, 300, 400, 500, 600, 700, 800])
-
-check("BST search: 400 bor",
-      bst.search(400) == True)
-
-check("BST search: 999 yo'q",
-      bst.search(999) == False)
-
-rq = bst.range_query(300, 600)
-check("BST range query [300,600] = [300,400,500,600]",
-      rq == [300, 400, 500, 600],
-      expected=[300, 400, 500, 600], got=rq)
-
-check("BST range query bo'sh oraliq",
-      bst.range_query(900, 1000) == [])
+assert_eq("BST inorder sorted", bst.inorder(), [20, 30, 40, 50, 60, 70, 80])
+assert_eq("BST search 40 = True",  bst.search(40), True)
+assert_eq("BST search 99 = False", bst.search(99), False)
+assert_eq("BST range [35,65]", bst.range_query(35, 65), [40, 50, 60])
+assert_eq("BST range no match", bst.range_query(90, 100), [])
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 3 – AVL Tree testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 3 – AVL Tree (Balanced BST)")
+# ══════════════════════════════════════════════
+#  7. AVL TREE TESTS
+# ══════════════════════════════════════════════
+header("AVL Tree – Self-Balancing Insert / Range Query")
 
-avl  = AVLTree()
-root = None
+avl = AVLTree()
+# Sorted insertion (would degrade BST to O(n), AVL stays O(log n))
+for v in [10, 20, 30, 40, 50, 60, 70]:
+    avl.insert(v)
 
-for v in [10, 20, 30, 40, 50, 25]:
-    root = avl.insert(root, v)
+assert_eq("AVL inorder sorted", avl.inorder(), [10, 20, 30, 40, 50, 60, 70])
+assert_eq("AVL search 30 = True",  avl.search(30), True)
+assert_eq("AVL search 99 = False", avl.search(99), False)
+assert_eq("AVL range [25,55]", avl.range_query(25, 55), [30, 40, 50])
 
-check("AVL inorder tartiblangan",
-      avl.inorder(root) == [10, 20, 25, 30, 40, 50])
-
-check("AVL height balanslangan (≤ 4)",
-      root.height <= 4)
-
-check("AVL takroriy qiymat qo'shilmaydi",
-      avl.inorder(avl.insert(root, 30)) == [10, 20, 25, 30, 40, 50])
+# Root should have height ≤ 3 (AVL balance guarantee)
+assert_true("AVL root height ≤ 4 after 7 insertions", avl._root.height <= 4)
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 3 – Hash Table testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 3 – Hash Table")
+# ══════════════════════════════════════════════
+#  8. HASH TABLE TESTS
+# ══════════════════════════════════════════════
+header("HashTable – O(1) PNR Lookup")
 
 ht = HashTable()
+assert_true("Get missing key returns string", isinstance(ht.get("X"), str))
 
-check("Mavjud bo'lmagan key – None qaytaradi",
-      ht.get("PNR999") is None)
+ht.add("PNR001", {"name": "Ali", "class": "Platinum"})
+ht.add("PNR002", {"name": "Bob", "class": "Economy"})
 
-ht.add("PNR001", "Ali Karimov")
-ht.add("PNR002", "Sara Lee")
-ht.add("PNR003", "Bobur")
+assert_eq("PNR001 lookup", ht.get("PNR001")["name"], "Ali")
+assert_eq("PNR002 lookup", ht.get("PNR002")["class"], "Economy")
+assert_true("exists PNR001 = True",  ht.exists("PNR001"))
+assert_true("exists PNR999 = False", not ht.exists("PNR999"))
 
-check("get() to'g'ri qiymat qaytaradi",
-      ht.get("PNR001") == "Ali Karimov")
+# Overwrite
+ht.add("PNR001", {"name": "Ali Updated", "class": "Gold"})
+assert_eq("PNR001 updated", ht.get("PNR001")["name"], "Ali Updated")
 
-check("Mavjud key ni yangilash",
-      (ht.add("PNR001", "Ali Updated") or True) and
-      ht.get("PNR001") == "Ali Updated")
-
-check("delete() ishlaydi",
-      ht.delete("PNR002") == True and ht.get("PNR002") is None)
-
-check("Mavjud bo'lmagan key ni delete – False",
-      ht.delete("PNR999") == False)
+# Delete
+ht.delete("PNR001")
+assert_true("After delete PNR001 not found", not ht.exists("PNR001"))
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 3 – KMP testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 3 – KMP String Matching")
+# ══════════════════════════════════════════════
+#  9. KMP TESTS  (real algorithm, not `in`)
+# ══════════════════════════════════════════════
+header("KMP – Knuth-Morris-Pratt String Search")
 
 kmp = KMP()
 
-check("KMP: pattern topildi",
-      kmp.contains("Ali Karimov", "Karimov") == True)
+# Basic match
+assert_eq("KMP: 'Ali' in manifest",
+          kmp.search("Ali Karimov on flight", "Ali"), [0])
 
-check("KMP: pattern topilmadi",
-      kmp.contains("Ali Karimov", "Smith") == False)
+# Multiple occurrences
+assert_eq("KMP: 'Ali' appears twice",
+          kmp.search("Ali and Ali", "Ali"), [0, 8])
 
-# Bir necha marta uchraydigan pattern
-positions = kmp.search("abababab", "ab")
-check("KMP: pattern bir necha marta – barcha indekslar",
-      positions == [0, 2, 4, 6],
-      expected=[0, 2, 4, 6], got=positions)
+# No match
+assert_eq("KMP: pattern not found = []",
+          kmp.search("John Smith", "Ali"), [])
 
-check("KMP: bo'sh pattern – bo'sh ro'yxat",
-      kmp.search("hello", "") == [])
+# Empty pattern
+assert_eq("KMP: empty pattern = []",
+          kmp.search("Hello", ""), [])
 
-check("KMP: pattern matndan uzun",
-      kmp.search("hi", "hello world") == [])
+# Empty text
+assert_eq("KMP: empty text = []",
+          kmp.search("", "Ali"), [])
 
-check("KMP: to'liq mos kelish",
-      kmp.search("abc", "abc") == [0])
+# Overlapping pattern
+assert_eq("KMP: overlapping 'ABAB' in 'ABABAB'",
+          kmp.search("ABABAB", "ABAB"), [0, 2])
+
+# Case sensitive
+assert_eq("KMP: case sensitive – 'ali' not in 'Ali'",
+          kmp.search("Ali", "ali"), [])
+
+# contains() helper
+assert_true("KMP contains() True",  kmp.contains("Tashkent departure", "Tashkent"))
+assert_true("KMP contains() False", not kmp.contains("Tashkent departure", "Dubai"))
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 4 – Sorting testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 4 – QuickSort & MergeSort")
+# ══════════════════════════════════════════════
+#  10. SORTING TESTS
+# ══════════════════════════════════════════════
+header("QuickSort & MergeSort")
 
 qs = QuickSort()
 ms = MergeSort()
 
-# Normal holat
-arr = [64, 34, 25, 12, 22, 11, 90]
-sorted_expected = [11, 12, 22, 25, 34, 64, 90]
+# Normal
+assert_eq("QuickSort [5,2,9,1]",    qs.sort([5,2,9,1]),    [1,2,5,9])
+assert_eq("MergeSort [5,2,9,1]",    ms.sort([5,2,9,1]),    [1,2,5,9])
 
-check("QuickSort to'g'ri saralaydi",
-      qs.sort(arr) == sorted_expected,
-      expected=sorted_expected, got=qs.sort(arr))
+# Already sorted
+assert_eq("QuickSort already sorted", qs.sort([1,2,3,4]), [1,2,3,4])
+assert_eq("MergeSort already sorted", ms.sort([1,2,3,4]), [1,2,3,4])
 
-check("MergeSort to'g'ri saralaydi",
-      ms.sort(arr) == sorted_expected,
-      expected=sorted_expected, got=ms.sort(arr))
+# Reverse sorted
+assert_eq("QuickSort reverse",  qs.sort([4,3,2,1]), [1,2,3,4])
+assert_eq("MergeSort reverse",  ms.sort([4,3,2,1]), [1,2,3,4])
 
-# Edge case: bo'sh ro'yxat
-check("QuickSort bo'sh massiv",
-      qs.sort([]) == [])
+# Single element
+assert_eq("QuickSort single",   qs.sort([42]), [42])
+assert_eq("MergeSort single",   ms.sort([42]), [42])
 
-check("MergeSort bo'sh massiv",
-      ms.sort([]) == [])
+# Empty list
+assert_eq("QuickSort empty",    qs.sort([]), [])
+assert_eq("MergeSort empty",    ms.sort([]), [])
 
-# Edge case: bir elementli
-check("QuickSort bir element",
-      qs.sort([42]) == [42])
+# Duplicates
+assert_eq("QuickSort duplicates", qs.sort([3,1,3,2,1]), [1,1,2,3,3])
+assert_eq("MergeSort duplicates", ms.sort([3,1,3,2,1]), [1,1,2,3,3])
 
-# Edge case: allaqachon tartiblangan
-asc = [1, 2, 3, 4, 5]
-check("QuickSort tartiblangan massiv",
-      qs.sort(asc) == [1, 2, 3, 4, 5])
+# compare_sorts
+cr = compare_sorts([9,7,5,3,1])
+assert_eq("compare_sorts quick == merge", cr["quick_result"], cr["merge_result"])
+assert_true("compare_sorts has a winner", cr["winner"] in ("QuickSort","MergeSort"))
 
-# Edge case: teskari tartiblangan
-desc = [5, 4, 3, 2, 1]
-check("MergeSort teskari tartiblangan massiv",
-      ms.sort(desc) == [1, 2, 3, 4, 5])
-
-# Edge case: takroriy elementlar
-dups = [3, 1, 4, 1, 5, 9, 2, 6, 5]
-check("QuickSort takroriy elementlar",
-      qs.sort(dups) == sorted(dups))
-
-check("Ikkalasi bir xil natija beradi",
-      qs.sort(arr) == ms.sort(arr))
-
-# Asl massiv o'zgarmasligi kerak (in-place emas)
-orig = [5, 3, 1]
-_ = qs.sort(orig)
-check("QuickSort asl massivni o'zgartirmaydi",
-      orig == [5, 3, 1])
+# Original list not mutated
+original = [3,1,4,1,5]
+qs.sort(original)
+assert_eq("QuickSort does not mutate input", original, [3,1,4,1,5])
 
 
-# ══════════════════════════════════════════════════════
-#  PHASE 5 – Backtracking testlar
-# ══════════════════════════════════════════════════════
-section("PHASE 5 – Backtracking (Route Finder)")
+# ══════════════════════════════════════════════
+#  11. ROUTING (BACKTRACKING) TESTS
+# ══════════════════════════════════════════════
+header("RouteFinder – Backtracking")
 
 rf = RouteFinder()
 
-net2 = {
-    "Tashkent": [("Dubai", 500),    ("Istanbul", 400)],
-    "Dubai":    [("Tashkent", 500), ("London", 700)],
-    "Istanbul": [("Tashkent", 400), ("London", 600)],
-    "London":   [("Dubai", 700),    ("Istanbul", 600)],
+base_graph = {
+    "A": [("B", 1), ("C", 1)],
+    "B": [("A", 1), ("D", 1)],
+    "C": [("A", 1), ("D", 1)],
+    "D": [("B", 1), ("C", 1)],
 }
 
-# Normal holat: 2 ta yo'l mavjud
-paths = rf.find(net2, "Tashkent", "London")
-check("Tashkent→London: 2 ta yo'l topiladi",
-      len(paths) == 2,
-      expected=2, got=len(paths))
+# All routes A→D
+routes = rf.find(base_graph, "A", "D")
+assert_eq("A→D: 2 routes exist", len(routes), 2)
+assert_true("Route via B exists", ["A","B","D"] in routes)
+assert_true("Route via C exists", ["A","C","D"] in routes)
 
-check("To'g'ri yo'llar: Dubai va Istanbul orqali",
-      ["Tashkent", "Dubai", "Istanbul", "London"] not in paths and
-      ["Tashkent", "Dubai", "London"] in paths)
+# Same source and destination
+routes = rf.find(base_graph, "A", "A")
+assert_eq("A→A returns [['A']]", routes, [["A"]])
 
-# Edge case: blok bilan
-paths_blocked = rf.find(net2, "Tashkent", "London", blocked="Dubai")
-check("Dubai yopilganda faqat 1 ta yo'l",
-      len(paths_blocked) == 1,
-      expected=1, got=len(paths_blocked))
+# Blocked hub
+routes_blocked = rf.find_with_blocked_hub(base_graph, "A", "D", "B")
+for r in routes_blocked:
+    assert_true(f"Blocked hub 'B' not in route {r}", "B" not in r)
 
-check("Qolgan yo'l Istanbul orqali",
-      ["Tashkent", "Istanbul", "London"] in paths_blocked)
+# No path (disconnected)
+disc = {"A": [("B", 1)], "B": [("A", 1)], "C": []}
+routes = rf.find(disc, "A", "C")
+assert_eq("No path → []", routes, [])
 
-# Edge case: mavjud bo'lmagan start
-paths2 = rf.find(net2, "Paris", "London")
-check("Mavjud bo'lmagan start – bo'sh ro'yxat",
-      paths2 == [])
+# Empty graph
+routes = rf.find({}, "A", "D")
+assert_eq("Empty graph → []", routes, [])
 
-# Edge case: start = end
-paths3 = rf.find(net2, "London", "London")
-check("Start = End – bir yo'l (faqat o'zi)",
-      paths3 == [["London"]])
+# Mutable default argument fix – calling twice should not accumulate paths
+rf2 = RouteFinder()
+r1 = rf2.find(base_graph, "A", "D")
+r2 = rf2.find(base_graph, "A", "D")
+assert_eq("Repeated call same result (mutable default fix)", r1, r2)
 
-# Edge case: yo'l yo'q (barcha yo'llar bloklangan)
-paths4 = rf.find(net2, "Tashkent", "London",
-                 blocked="Istanbul")
-# faqat Dubai orqali qoladi
-check("Istanbul bloklanganda Dubai orqali yo'l bor",
-      len(paths4) >= 1)
+# Cyclic graph (should not loop infinitely)
+cyclic = {
+    "A": [("B", 1)],
+    "B": [("A", 1), ("C", 1)],
+    "C": [("B", 1)],
+}
+try:
+    routes = rf.find(cyclic, "A", "C")
+    assert_eq("Cyclic graph A→C finds 1 path", len(routes), 1)
+except RecursionError:
+    print(f"{FAIL}  Cyclic graph caused RecursionError")
 
-# Edge case: bo'sh graf
-paths5 = rf.find({}, "A", "B")
-check("Bo'sh grafda yo'l topilmaydi",
-      paths5 == [])
+
+# ══════════════════════════════════════════════
+#  12. BELLMAN-FORD TESTS
+# ══════════════════════════════════════════════
+header("Bellman-Ford – Shortest Path")
+
+bf = BellmanFord()
+
+# Empty graph
+r = bf.shortest_path({}, "X")
+assert_true("Empty graph returns error string", isinstance(r, str))
+
+# Unknown source
+r = bf.shortest_path({"A": []}, "Z")
+assert_true("Unknown source returns error string", isinstance(r, str))
+
+# Standard graph — same as Dijkstra test
+graph_bf = {
+    "A": [("B", 5), ("C", 10)],
+    "B": [("C", 3), ("A", 5)],
+    "C": [("A", 10), ("B", 3)],
+}
+r = bf.shortest_path(graph_bf, "A")
+assert_eq("BF A→A distance = 0",  r["A"][0], 0)
+assert_eq("BF A→B distance = 5",  r["B"][0], 5)
+assert_eq("BF A→C distance = 8",  r["C"][0], 8)   # via B: 5+3
+
+# Dijkstra and Bellman-Ford must give IDENTICAL results
+d2  = Dijkstra()
+bf2 = BellmanFord()
+graph_same = {
+    "Tashkent": [("Dubai", 500), ("Istanbul", 400)],
+    "Dubai":    [("Tashkent", 500), ("London", 700)],
+    "Istanbul": [("Tashkent", 400), ("London", 600)],
+    "London":   [("Dubai", 700), ("Istanbul", 600)],
+}
+dr = d2.shortest_path(graph_same, "Tashkent")
+br = bf2.shortest_path(graph_same, "Tashkent")
+for node in graph_same:
+    assert_eq(
+        f"Dijkstra == BellmanFord cost to {node}",
+        dr[node][0], br[node][0]
+    )
+
+# Disconnected node
+graph_disc2 = {
+    "A": [("B", 1)],
+    "B": [("A", 1)],
+    "C": [],
+}
+r = bf.shortest_path(graph_disc2, "A")
+assert_eq("BF disconnected node C = inf", r["C"][0], float('inf'))
+
+# Negative cycle detection
+# Build a graph where A→B→C→A has total weight -1 (negative cycle)
+graph_neg_cycle = {
+    "A": [("B", 1)],
+    "B": [("C", 1)],
+    "C": [("A", -3)],   # -3 creates a negative cycle: 1+1-3 = -1
+}
+r = bf.shortest_path(graph_neg_cycle, "A")
+assert_true("Negative cycle detected → returns error string", isinstance(r, str))
+
+# show_steps=True must not crash
+try:
+    bf.shortest_path(graph_same, "Tashkent", show_steps=True)
+    print(f"{PASS}  show_steps=True runs without error")
+except Exception as e:
+    print(f"{FAIL}  show_steps=True crashed: {e}")
+
+# compare_shortest_paths must not crash
+try:
+    compare_shortest_paths(graph_same, "Tashkent")
+    print(f"{PASS}  compare_shortest_paths() runs without error")
+except Exception as e:
+    print(f"{FAIL}  compare_shortest_paths() crashed: {e}")
 
 
-# ══════════════════════════════════════════════════════
-#  Yakuniy natija
-# ══════════════════════════════════════════════════════
-summary()
+# ══════════════════════════════════════════════
+#  SUMMARY
+# ══════════════════════════════════════════════
+print("\n" + "═"*55)
+print("  All test cases completed.")
+print("═"*55 + "\n")

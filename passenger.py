@@ -2,152 +2,71 @@ import heapq
 from collections import deque
 
 
-# ══════════════════════════════════════════════
-#  PRIORITY CHECK-IN  –  Max-Heap (Priority Queue)
-#  ADT: PriorityQueue
-#  push : O(log n)
-#  pop  : O(log n)
-#  peek : O(1)
-# ══════════════════════════════════════════════
-
-TICKET_RANK = {
-    "Platinum": 3,
-    "Gold":     2,
-    "Silver":   1,
-    "Economy":  0,
-}
-
-
 class PriorityCheckIn:
-    """
-    Passengers are served by ticket class (Platinum > Gold > Silver > Economy).
-    Ties are broken by arrival order (FIFO within same class).
-
-    Internal representation: min-heap with negated priority so the
-    highest-priority passenger is always at the top.
-    """
+    LEVELS = {"Platinum": 3, "Gold": 2, "Economy": 1}
 
     def __init__(self):
-        self._heap    = []      # ( -priority, arrival_order, name, ticket_class )
-        self._counter = 0       # arrival order counter
+        self.heap     = []
+        self._counter = 0
 
-    # ---------- public interface ----------
-
-    def add_passenger(self, name: str, ticket_class: str) -> None:
-        if not name.strip():
-            raise ValueError("Passenger name cannot be empty.")
-        if ticket_class not in TICKET_RANK:
-            raise ValueError(
-                f"Unknown ticket class '{ticket_class}'. "
-                f"Valid: {list(TICKET_RANK.keys())}"
-            )
-        priority = TICKET_RANK[ticket_class]
-        heapq.heappush(self._heap, (-priority, self._counter, name, ticket_class))
+    def add_passenger(self, name, level):
+        priority = self.LEVELS.get(level, 1)
+        heapq.heappush(self.heap, (-priority, self._counter, name, level))
         self._counter += 1
+        print(f"  + {name} ({level}) navbatga qo'shildi.")
 
-    def serve(self) -> dict | str:
-        """Remove and return the highest-priority passenger."""
-        if self.is_empty():
-            return "Check-in queue is empty – no passengers waiting."
-        _, _, name, ticket_class = heapq.heappop(self._heap)
-        return {"name": name, "class": ticket_class}
+    def serve(self):
+        if not self.heap:
+            return "  Navbat bo'sh."
+        _, _, name, level = heapq.heappop(self.heap)
+        return f"  Xizmat: {name} [{level}]"
 
-    def peek(self) -> dict | str:
-        """View next passenger without removing."""
-        if self.is_empty():
-            return "Queue is empty."
-        _, _, name, ticket_class = self._heap[0]
-        return {"name": name, "class": ticket_class}
+    def peek(self):
+        if not self.heap:
+            return "  Navbat bo'sh."
+        _, _, name, level = self.heap[0]
+        return f"  Keyingi: {name} [{level}]"
 
-    def is_empty(self) -> bool:
-        return len(self._heap) == 0
-
-    def size(self) -> int:
-        return len(self._heap)
+    def size(self):
+        return len(self.heap)
 
 
-# ══════════════════════════════════════════════
-#  BOARDING GATE QUEUE  –  FIFO (Standard Queue)
-#  ADT: Queue
-#  enqueue : O(1)
-#  dequeue : O(1)
-# ══════════════════════════════════════════════
 class BoardingQueue:
-    """
-    Standard FIFO queue for passengers boarding the aircraft.
-    First passenger to join the queue is first to board.
-    """
-
     def __init__(self):
-        self._queue = deque()
+        self.queue = deque()
 
-    def add(self, passenger: str) -> None:
-        if not passenger.strip():
-            raise ValueError("Passenger name cannot be empty.")
-        self._queue.append(passenger)
+    def add(self, passenger):
+        self.queue.append(passenger)
+        print(f"  + {passenger} boarding navbatiga qo'shildi.")
 
-    def remove(self) -> str:
-        if self.is_empty():
-            return "Boarding gate queue is empty."
-        return self._queue.popleft()
+    def remove(self):
+        if not self.queue:
+            return "  Boarding navbati bo'sh."
+        passenger = self.queue.popleft()
+        return f"  Boarding: {passenger} samolyotga kirdi."
 
-    def peek(self) -> str:
-        if self.is_empty():
-            return "Queue is empty."
-        return self._queue[0]
-
-    def is_empty(self) -> bool:
-        return len(self._queue) == 0
-
-    def size(self) -> int:
-        return len(self._queue)
-
-    def display(self) -> None:
-        if self.is_empty():
-            print("  [Boarding queue is empty]")
-        else:
-            print("  Boarding order:", " → ".join(self._queue))
+    def size(self):
+        return len(self.queue)
 
 
-# ══════════════════════════════════════════════
-#  CARGO HOLD STACK  –  LIFO (Stack)
-#  ADT: Stack
-#  push : O(1)
-#  pop  : O(1)
-#  peek : O(1)
-# ══════════════════════════════════════════════
 class CargoStack:
-    """
-    LIFO stack simulating a cargo hold.
-    Last bag loaded is the first to be unloaded.
-    """
-
     def __init__(self):
-        self._stack = []
+        self.stack = []
 
-    def push(self, item: str) -> None:
-        if not item.strip():
-            raise ValueError("Cargo item name cannot be empty.")
-        self._stack.append(item)
+    def push(self, item):
+        self.stack.append(item)
+        print(f"  + '{item}' yukxonaga joylashtirildi.")
 
-    def pop(self) -> str:
-        if self.is_empty():
-            return "Cargo hold is empty – nothing to unload."
-        return self._stack.pop()
+    def pop(self):
+        if not self.stack:
+            return "  Yukxona bo'sh."
+        item = self.stack.pop()
+        return f"  Yukxonadan chiqarildi: '{item}'"
 
-    def peek(self) -> str:
-        if self.is_empty():
-            return "Stack is empty."
-        return self._stack[-1]
+    def peek(self):
+        if not self.stack:
+            return "  Yukxona bo'sh."
+        return f"  Tepada: '{self.stack[-1]}'"
 
-    def is_empty(self) -> bool:
-        return len(self._stack) == 0
-
-    def size(self) -> int:
-        return len(self._stack)
-
-    def display(self) -> None:
-        if self.is_empty():
-            print("  [Cargo hold is empty]")
-        else:
-            print("  Cargo hold (top → bottom):", " | ".join(reversed(self._stack)))
+    def size(self):
+        return len(self.stack)

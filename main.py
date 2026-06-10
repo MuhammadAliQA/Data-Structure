@@ -1,358 +1,279 @@
-from graph     import Graph, Dijkstra, BellmanFord, Kruskal, compare_shortest_paths
+from graph     import Graph, Dijkstra, Kruskal, BellmanFord, Prim
 from passenger import PriorityCheckIn, BoardingQueue, CargoStack
 from search    import BST, AVLTree, HashTable, KMP
-from sorting   import compare_sorts
+from sorting   import QuickSort, MergeSort, compare_sorts, full_compare
 from routing   import RouteFinder
 
-# ══════════════════════════════════════════════
-#  SKYNET – Global Aviation Logistics System
-#  Console Application  (main entry point)
-# ══════════════════════════════════════════════
-
-# ── Global instances ──────────────────────────
-graph    = Graph()
-dijkstra = Dijkstra()
-bellman  = BellmanFord()
-kruskal  = Kruskal()
-
-check_in = PriorityCheckIn()
-boarding = BoardingQueue()
+g        = Graph()
+d        = Dijkstra()
+k        = Kruskal()
+bf       = BellmanFord()
+prim     = Prim()
+check    = PriorityCheckIn()
+queue    = BoardingQueue()
 cargo    = CargoStack()
-
 bst      = BST()
 avl      = AVLTree()
-hash_tbl = HashTable()
+avl_root = None
+ht       = HashTable()
 kmp      = KMP()
+rf       = RouteFinder()
 
-router   = RouteFinder()
+
+def chiziq(belgi="─", uzunlik=50):
+    print(belgi * uzunlik)
 
 
-# ──────────────────────────────────────────────
+def sarlavha(nom):
+    chiziq("═")
+    print(f"  {nom}")
+    chiziq("═")
+
+
 def setup():
-    """Seed the system with initial airport and price data."""
-    for airport in ["Tashkent", "Dubai", "Istanbul", "London", "Moscow", "Delhi"]:
-        graph.add_airport(airport)
-
-    flights = [
+    for shahar in ["Tashkent", "Dubai", "Istanbul", "London"]:
+        g.add_airport(shahar)
+    for src, dst, narx in [
         ("Tashkent", "Dubai",    500),
         ("Tashkent", "Istanbul", 400),
-        ("Tashkent", "Moscow",   300),
         ("Dubai",    "London",   700),
-        ("Dubai",    "Delhi",    350),
         ("Istanbul", "London",   600),
-        ("Moscow",   "Istanbul", 450),
-        ("Delhi",    "London",   800),
+    ]:
+        g.add_undirected_flight(src, dst, narx)
+    for narx in [500, 400, 700, 600, 350, 800, 250]:
+        bst.insert(narx)
+    global avl_root
+    for narx in [500, 400, 700, 600, 350, 800, 250]:
+        avl_root = avl.insert(avl_root, narx)
+    for pnr, ism in [
+        ("PNR001", "Ali Karimov"),
+        ("PNR002", "John Smith"),
+        ("PNR003", "Sara Lee"),
+        ("PNR004", "Bobur Rahimov"),
+    ]:
+        ht.add(pnr, ism)
+
+
+def show_graph():
+    sarlavha("PHASE 1 – Reys tarmog'i")
+    g.display()
+
+
+def show_dijkstra():
+    sarlavha("PHASE 1 – Dijkstra: Eng qisqa yo'l")
+    start = "Tashkent"
+    dists, prev = d.shortest_path(g.graph, start)
+    if dists is None:
+        print(f"  {prev}")
+        return
+    print(f"  Boshlanish: {start}\n")
+    print(f"  {'Manzil':<14} {'Narx ($)':>10}   Yo'l")
+    chiziq()
+    for shahar in ["Dubai", "Istanbul", "London"]:
+        narx  = dists[shahar]
+        yol   = d.get_path(prev, start, shahar)
+        matn  = " → ".join(yol) if yol else "yo'q"
+        belgi = "  *" if shahar == "London" else "   "
+        print(f"{belgi} {shahar:<14} {narx:>10}   {matn}")
+    chiziq()
+    print("  * = eng arzon umumiy marshrut")
+
+
+def show_mst():
+    sarlavha("PHASE 1 – Kruskal: Minimum Spanning Tree")
+    edges, total = k.mst(g.graph)
+    print(f"  {'Ulanish':<32} {'Narx ($)':>8}")
+    chiziq()
+    for u, v, w in edges:
+        print(f"  {u} -- {v:<22} {w:>8}")
+    chiziq()
+    print(f"  Umumiy narx: ${total}")
+    print(f"  {len(edges)} ta ulanish, {len(g.graph)} ta aeroport")
+
+
+def show_priority():
+    sarlavha("PHASE 2 – Priority Queue (Max-Heap)")
+    yolovchilar = [
+        ("Ali Karimov",    "Economy"),
+        ("Sara Lee",       "Platinum"),
+        ("Bobur Rahimov",  "Gold"),
+        ("John Smith",     "Platinum"),
+        ("Malika Yusupova","Economy"),
     ]
-    for src, dst, cost in flights:
-        graph.add_flight(src, dst, cost)
-
-    for price in [350, 500, 700, 400, 300, 800, 600, 450]:
-        bst.insert(price)
-        avl.insert(price)
-
-    hash_tbl.add("PNR001", {"name": "Ali Karimov",  "seat": "1A",  "class": "Platinum"})
-    hash_tbl.add("PNR002", {"name": "John Smith",   "seat": "12B", "class": "Gold"})
-    hash_tbl.add("PNR003", {"name": "Sara Johnson", "seat": "23C", "class": "Economy"})
-
-
-# ──────────────────────────────────────────────
-def sep(title=""):
-    line = "─" * 50
-    if title:
-        print(f"\n  ┌{line}┐")
-        print(f"  │  {title:<48}│")
-        print(f"  └{line}┘")
-    else:
-        print(f"  {line}")
+    print("  Navbatga qo'shilmoqda:\n")
+    for ism, daraja in yolovchilar:
+        check.add_passenger(ism, daraja)
+    print(f"\n  Jami: {check.size()} kishi")
+    print("\n  Xizmat tartibi:")
+    chiziq()
+    while check.size() > 0:
+        print(check.serve())
+    chiziq()
 
 
-def pause():
-    input("\n  [Press ENTER to continue]")
+def show_queue_stack():
+    sarlavha("PHASE 2 – Boarding Queue (FIFO) va Cargo Stack (LIFO)")
+    print("  [ BOARDING GATE – FIFO ]")
+    for p in ["Bobur", "Sara", "Ali"]:
+        queue.add(p)
+    print(f"\n  Boarding ({queue.size()} kishi):")
+    while queue.size() > 0:
+        print(queue.remove())
+
+    print("\n  [ YUKXONA – LIFO Stack ]")
+    for yuk in ["Buggy #1", "Suitcase #2", "Box #3"]:
+        cargo.push(yuk)
+    print(f"\n  Yuklar tushirilmoqda ({cargo.size()} dona):")
+    while cargo.size() > 0:
+        print(cargo.pop())
 
 
-def print_path_results(label: str, origin: str, result):
-    """Shared helper – prints shortest path results for both algorithms."""
-    if isinstance(result, str):
-        print(f"  {result}")
-        return
-    print(f"\n  Cheapest routes from '{origin}' ({label}):")
-    for dest, (cost, path) in result.items():
-        if dest == origin:
-            continue
-        cost_str = str(cost) if cost != float('inf') else "unreachable"
-        path_str = " -> ".join(path) if path else "no path"
-        print(f"    {dest:<15}  cost={cost_str:<8}  path: {path_str}")
+def show_search():
+    sarlavha("PHASE 3 – BST, AVL, Hash Table, KMP")
 
+    print("  [ BST ]")
+    print(f"  Barcha narxlar: {bst.inorder()}")
+    low, high = 400, 650
+    print(f"  ${low}–${high} oralig'i: {bst.range_query(low, high)}")
+    print(f"  $600 bor? {bst.search(600)}   $999 bor? {bst.search(999)}")
 
-# ══════════════════════════════════════════════
-#  MENU HANDLERS
-# ══════════════════════════════════════════════
+    print("\n  [ AVL Tree ]")
+    print(f"  Inorder: {avl.inorder(avl_root)}")
 
-def menu_graph():
-    sep("PHASE 1 - Flight Network (Graph)")
-    graph.display()
-    pause()
+    print("\n  [ Hash Table ]")
+    for pnr in ["PNR001", "PNR003", "PNR999"]:
+        natija = ht.get(pnr)
+        print(f"  {pnr} --> {natija if natija else 'Topilmadi'}")
+    print(f"  Load factor: {ht.load_factor()}")
 
-
-def menu_dijkstra():
-    sep("PHASE 1 - Dijkstra Shortest Paths")
-    origin = input("  Enter origin airport: ").strip()
-    result = dijkstra.shortest_path(graph.graph, origin)
-    print_path_results("Dijkstra", origin, result)
-    pause()
-
-
-def menu_bellman_ford():
-    sep("D1 - Bellman-Ford Shortest Path (step-by-step)")
-    origin = input("  Enter origin airport: ").strip()
-    result = bellman.shortest_path(graph.graph, origin, show_steps=True)
-    print_path_results("Bellman-Ford", origin, result)
-    pause()
-
-
-def menu_compare_algorithms():
-    sep("D1 - Dijkstra vs Bellman-Ford (Full Illustration)")
-    origin = input("  Enter origin airport: ").strip()
-    compare_shortest_paths(graph.graph, origin)
-    pause()
-
-
-def menu_mst():
-    sep("PHASE 1 - Minimum Spanning Tree (Kruskal)")
-    edges, total = kruskal.mst(graph.graph)
-    if not edges:
-        print("  MST could not be built (empty graph).")
-    else:
-        print(f"\n  MST edges ({len(edges)} connections):")
-        for u, v, w in edges:
-            print(f"    {u}  --{w}--  {v}")
-        print(f"\n  Total MST cost: {total}")
-    pause()
-
-
-def menu_priority():
-    sep("PHASE 2 - Priority Check-in (Max-Heap)")
-    print("  1. Add passenger")
-    print("  2. Serve next passenger")
-    print("  3. Peek next passenger")
-    print("  4. Queue size")
-    choice = input("  Choice: ").strip()
-
-    if choice == "1":
-        name  = input("  Passenger name: ").strip()
-        level = input("  Ticket class (Platinum/Gold/Silver/Economy): ").strip()
-        try:
-            check_in.add_passenger(name, level)
-            print(f"  OK  {name} ({level}) added to check-in queue.")
-        except ValueError as e:
-            print(f"  ERR {e}")
-
-    elif choice == "2":
-        result = check_in.serve()
-        if isinstance(result, dict):
-            print(f"  OK  Serving: {result['name']}  [{result['class']}]")
+    print("\n  [ KMP ]")
+    manifest = "Ali Karimov, Sara Lee, Bobur Rahimov, John Smith"
+    for pattern in ["Sara", "Bobur", "Omar"]:
+        pozitsiyalar = kmp.search(manifest, pattern)
+        if pozitsiyalar:
+            print(f"  '{pattern}' topildi – indeks: {pozitsiyalar}")
         else:
-            print(f"  {result}")
-
-    elif choice == "3":
-        result = check_in.peek()
-        if isinstance(result, dict):
-            print(f"  Next: {result['name']}  [{result['class']}]")
-        else:
-            print(f"  {result}")
-
-    elif choice == "4":
-        print(f"  Passengers waiting: {check_in.size()}")
-
-    pause()
+            print(f"  '{pattern}' – yo'q")
 
 
-def menu_queue_stack():
-    sep("PHASE 2 - Boarding Queue (FIFO) & Cargo Stack (LIFO)")
-    print("  1. Add to boarding queue")
-    print("  2. Board next passenger (dequeue)")
-    print("  3. Load cargo bag (push)")
-    print("  4. Unload cargo bag (pop)")
-    print("  5. Display queue and stack")
-    choice = input("  Choice: ").strip()
-
-    if choice == "1":
-        name = input("  Passenger name: ").strip()
-        try:
-            boarding.add(name)
-            print(f"  OK  {name} added to boarding queue.")
-        except ValueError as e:
-            print(f"  ERR {e}")
-
-    elif choice == "2":
-        print(f"  Boarding: {boarding.remove()}")
-
-    elif choice == "3":
-        item = input("  Cargo item: ").strip()
-        try:
-            cargo.push(item)
-            print(f"  OK  '{item}' loaded into cargo hold.")
-        except ValueError as e:
-            print(f"  ERR {e}")
-
-    elif choice == "4":
-        print(f"  Unloaded: {cargo.pop()}")
-
-    elif choice == "5":
-        boarding.display()
-        cargo.display()
-
-    pause()
+def show_sort():
+    sarlavha("PHASE 4 – QuickSort vs MergeSort")
+    data = [850, 200, 620, 410, 990, 130, 750, 380, 560, 240]
+    print(f"  Kiruvchi: {data}\n")
+    res_q, res_m, time_q, time_m, mem_q, mem_m = full_compare(data)
+    print(f"  {'Algoritm':<12} {'Natija':<44} {'Vaqt(µs)':>9}  {'Xotira(B)':>9}")
+    chiziq()
+    print(f"  {'QuickSort':<12} {str(res_q):<44} {time_q:>9.2f}  {mem_q:>9}")
+    print(f"  {'MergeSort':<12} {str(res_m):<44} {time_m:>9.2f}  {mem_m:>9}")
+    chiziq()
+    print(f"\n  Tezroq:    {'QuickSort' if time_q < time_m else 'MergeSort'}")
+    print(f"  Tejamroq:  {'QuickSort' if mem_q < mem_m else 'MergeSort'}")
+    print("\n  QuickSort: O(n log n) ort., O(n²) eng yomon, O(log n) xotira")
+    print("  MergeSort: O(n log n) har doim,          O(n) xotira")
 
 
-def menu_search():
-    sep("PHASE 3 - BST / AVL Price Search & Hash Table PNR Lookup")
-    print("  1. BST range query (flight prices)")
-    print("  2. AVL range query (flight prices)")
-    print("  3. PNR lookup (Hash Table)")
-    print("  4. Add new PNR record")
-    print("  5. Show all values inorder (BST & AVL)")
-    choice = input("  Choice: ").strip()
-
-    if choice == "1":
-        low  = int(input("  Min price: "))
-        high = int(input("  Max price: "))
-        res  = bst.range_query(low, high)
-        print(f"  BST prices in [{low}-{high}]: {res if res else 'none found'}")
-
-    elif choice == "2":
-        low  = int(input("  Min price: "))
-        high = int(input("  Max price: "))
-        res  = avl.range_query(low, high)
-        print(f"  AVL prices in [{low}-{high}]: {res if res else 'none found'}")
-
-    elif choice == "3":
-        pnr = input("  Enter PNR: ").strip()
-        print(f"  Result: {hash_tbl.get(pnr)}")
-
-    elif choice == "4":
-        pnr  = input("  PNR code: ").strip()
-        name = input("  Passenger name: ").strip()
-        seat = input("  Seat: ").strip()
-        cls  = input("  Class: ").strip()
-        hash_tbl.add(pnr, {"name": name, "seat": seat, "class": cls})
-        print(f"  OK  PNR '{pnr}' added.")
-
-    elif choice == "5":
-        print(f"  BST inorder (sorted): {bst.inorder()}")
-        print(f"  AVL inorder (sorted): {avl.inorder()}")
-
-    pause()
+def show_compare_sp():
+    sarlavha("D1 – Dijkstra vs Bellman-Ford")
+    dists_d, _ = d.shortest_path(g.graph, "Tashkent")
+    dists_b, _ = bf.shortest_path(g.graph, "Tashkent")
+    print(f"  {'Manzil':<14} {'Dijkstra':>10}  {'Bellman-Ford':>13}  {'Mos?':>5}")
+    chiziq()
+    for shahar in ["Dubai", "Istanbul", "London"]:
+        dd    = dists_d[shahar]
+        db    = dists_b[shahar]
+        print(f"  {shahar:<14} {dd:>10}  {db:>13}  {'Ha' if dd==db else 'Yo\'q':>5}")
+    chiziq()
+    print(f"\n  {'Xususiyat':<26} {'Dijkstra':>14}  {'Bellman-Ford':>13}")
+    chiziq()
+    for xus, dj, bell in [
+        ("Vaqt",                "O((V+E)logV)", "O(V·E)"),
+        ("Manfiy edge",         "Yo'q",         "Ha"),
+        ("Manfiy sikl aniqlash","Yo'q",         "Ha"),
+        ("Zich grafda",         "Tezroq",       "Sekinroq"),
+    ]:
+        print(f"  {xus:<26} {dj:>14}  {bell:>13}")
+    chiziq()
 
 
-def menu_kmp():
-    sep("PHASE 4 - KMP Passenger Name Search")
-    manifest = input("  Enter flight manifest text: ").strip()
-    pattern  = input("  Enter name/pattern to find: ").strip()
-    indices  = kmp.search(manifest, pattern)
-    if indices:
-        print(f"  OK  Pattern '{pattern}' found at position(s): {indices}")
+def show_prim():
+    sarlavha("D1 – Kruskal vs Prim (MST)")
+    edges_k, total_k = k.mst(g.graph)
+    edges_p, total_p = prim.mst(g.graph, start="Tashkent")
+    print(f"  {'Kruskal':<36} {'Prim (start=Tashkent)'}")
+    chiziq()
+    for i in range(max(len(edges_k), len(edges_p))):
+        ek = f"{edges_k[i][0]} -- {edges_k[i][1]} (${edges_k[i][2]})" if i < len(edges_k) else ""
+        ep = f"{edges_p[i][0]} -> {edges_p[i][1]} (${edges_p[i][2]})" if i < len(edges_p) else ""
+        print(f"  {ek:<36} {ep}")
+    chiziq()
+    print(f"  Kruskal jami: ${total_k}    Prim jami: ${total_p}")
+    print(f"\n  {'Xususiyat':<26} {'Kruskal':>12}  {'Prim':>10}")
+    chiziq()
+    for xus, kr, pr in [
+        ("Yondashuv",         "Edge-based",  "Node-based"),
+        ("Vaqt",              "O(E log E)",  "O(E log V)"),
+        ("Siyrak grafda",     "Tezroq",      "Sekinroq"),
+        ("Zich grafda",       "Sekinroq",    "Tezroq"),
+    ]:
+        print(f"  {xus:<26} {kr:>12}  {pr:>10}")
+    chiziq()
+
+
+def show_routes():
+    sarlavha("PHASE 5 – Backtracking: Muqobil Marshrut")
+    start, end = "Tashkent", "London"
+    print(f"  Barcha yo'llar: {start} → {end}\n")
+    for i, yol in enumerate(rf.find(g.graph, start, end), 1):
+        print(f"  Yo'l {i}: {' → '.join(yol)}")
+    print()
+    blocked = "Dubai"
+    print(f"  '{blocked}' yopilganda:\n")
+    muqobil = rf.find(g.graph, start, end, blocked=blocked)
+    if muqobil:
+        for i, yol in enumerate(muqobil, 1):
+            print(f"  Yo'l {i}: {' → '.join(yol)}")
     else:
-        print(f"  --  Pattern '{pattern}' not found in manifest.")
-    pause()
+        print("  Muqobil yo'l topilmadi!")
 
 
-def menu_sort():
-    sep("PHASE 4 - Sorting Flight Schedules")
-    print("  1. Enter custom data")
-    print("  2. Use sample departure times")
-    choice = input("  Choice: ").strip()
-
-    if choice == "1":
-        raw  = input("  Enter numbers separated by spaces: ")
-        data = [int(x) for x in raw.split() if x.isdigit()]
-    else:
-        # Fixed: no leading-zero octal literals; use plain integers
-        data = [1430, 600, 1800, 945, 2200, 1115, 730, 1645]
-        print(f"  Sample departure times: {data}")
-
-    if not data:
-        print("  No data to sort.")
-        pause()
-        return
-
-    result = compare_sorts(data)
-
-    print(f"\n  QuickSort result : {result['quick_result']}")
-    print(f"  MergeSort result : {result['merge_result']}")
-    print(f"\n  QuickSort time   : {result['quick_time_us']} us")
-    print(f"  MergeSort time   : {result['merge_time_us']} us")
-    print(f"  Faster algorithm : {result['winner']}")
-    pause()
+MENU = {
+    "1":  ("Reys tarmog'i",           show_graph),
+    "2":  ("Dijkstra",                show_dijkstra),
+    "3":  ("MST – Kruskal",           show_mst),
+    "4":  ("Priority Check-In",       show_priority),
+    "5":  ("Boarding & Cargo",        show_queue_stack),
+    "6":  ("BST / AVL / Hash / KMP",  show_search),
+    "7":  ("Sort taqqoslash",         show_sort),
+    "8":  ("Backtracking marshrut",   show_routes),
+    "9":  ("Dijkstra vs Bellman-Ford",show_compare_sp),
+    "10": ("Kruskal vs Prim",         show_prim),
+    "0":  ("Chiqish",                 None),
+}
 
 
-def menu_routes():
-    sep("PHASE 5 - Backtracking Route Finder")
-    print("  1. Find all routes between two airports")
-    print("  2. Find alternative routes (blocked hub)")
-    choice = input("  Choice: ").strip()
-
-    start = input("  Origin airport      : ").strip()
-    end   = input("  Destination airport : ").strip()
-
-    if choice == "2":
-        hub    = input("  Blocked hub airport : ").strip()
-        routes = router.find_with_blocked_hub(graph.graph, start, end, hub)
-        print(f"\n  Routes from {start} to {end} avoiding '{hub}':")
-    else:
-        routes = router.find(graph.graph, start, end)
-        print(f"\n  All routes from {start} to {end}:")
-
-    if not routes:
-        print("  No routes found.")
-    else:
-        for i, route in enumerate(routes, 1):
-            print(f"  Route {i}: {' -> '.join(route)}")
-    pause()
+def menyu():
+    print()
+    chiziq("═")
+    print("  SKYNET – Aviatsiya Boshqaruv Tizimi")
+    chiziq("═")
+    for key, (nom, _) in MENU.items():
+        print(f"  {key:>2}.  {nom}")
+    chiziq("─")
 
 
-# ══════════════════════════════════════════════
-#  MAIN LOOP
-# ══════════════════════════════════════════════
 def main():
     setup()
-    print("\n  ╔══════════════════════════════════════╗")
-    print("  ║   SkyNet Aviation Logistics System   ║")
-    print("  ╚══════════════════════════════════════╝")
-
-    menu = {
-        "1": ("Show Flight Network (Graph)",               menu_graph),
-        "2": ("Dijkstra  - Shortest Path",                 menu_dijkstra),
-        "3": ("Bellman-Ford - Shortest Path (steps)",      menu_bellman_ford),
-        "4": ("D1 - Dijkstra vs Bellman-Ford (compare)",  menu_compare_algorithms),
-        "5": ("Kruskal  - Minimum Spanning Tree",          menu_mst),
-        "6": ("Priority Check-in (Heap)",                  menu_priority),
-        "7": ("Boarding Queue & Cargo Stack",              menu_queue_stack),
-        "8": ("BST / AVL Price Search + PNR Lookup",       menu_search),
-        "9": ("KMP Passenger Name Search",                 menu_kmp),
-        "A": ("Sort Flight Schedules (Quick & Merge)",     menu_sort),
-        "B": ("Route Finder (Backtracking)",               menu_routes),
-        "0": ("Exit",                                      None),
-    }
-
     while True:
-        print("\n  ┌──────────────────────────────────────────┐")
-        print("  │              MAIN MENU                   │")
-        print("  ├──────────────────────────────────────────┤")
-        for key, (label, _) in menu.items():
-            print(f"  │  [{key}]  {label:<38}│")
-        print("  └──────────────────────────────────────────┘")
-
-        user_choice = input("  Select option: ").strip().upper()
-
-        if user_choice == "0":
-            print("\n  Goodbye - SkyNet shutting down.\n")
+        menyu()
+        tanlov = input("  Tanlang: ").strip()
+        if tanlov == "0":
+            print("\n  Chiqildi. Xayr!\n")
             break
-        elif user_choice in menu:
-            _, handler = menu[user_choice]
-            handler()
+        if tanlov in MENU:
+            print()
+            MENU[tanlov][1]()
         else:
-            print("  Invalid option. Please try again.")
+            print("  Noto'g'ri tanlov!")
 
 
 if __name__ == "__main__":
